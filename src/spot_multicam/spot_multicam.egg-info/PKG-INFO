@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: spot-multicam
+Version: 0.1.0
+Summary: ROS2 reimplementation of the distributed IDS multi-camera capture system (MultiCamera-IDS-Capture), starting with a single-camera node.
+Maintainer: Rohith Belur Ravish
+Maintainer-email: rohithbr@gmx.de
+License: MIT

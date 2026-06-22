@@ -1,0 +1,11 @@
+camera_capture_node:
+  ros__parameters:
+    frame_rate: 10.0
+    exposure_us: 10000
+    black_level: 0.0
+    gain_db: 0.0
+    trigger_mode: "software"
+    buffers: 16
+    focus_fixed: -1
+    width: 640
+    height: 480

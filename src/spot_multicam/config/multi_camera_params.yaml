@@ -1,0 +1,30 @@
+# Phase 2 scaffolding - mirrors the original REMOTE_NODES_JSON array, one block
+# per physical camera/Pi. Add or remove top-level keys (cam1, cam2, ...) to
+# match how many cameras are actually deployed; multi_camera.launch.py reads
+# this file and spins up one namespaced node per entry automatically.
+
+cam1:
+  ros__parameters:
+    serial: ""           # fill in real IDS serial once off mock backend
+    frame_rate: 10.0
+    exposure_us: 10000
+    black_level: 0.0
+    gain_db: 0.0
+    trigger_mode: "software"
+    buffers: 16
+    focus_fixed: -1
+    width: 640
+    height: 480
+
+cam2:
+  ros__parameters:
+    serial: ""
+    frame_rate: 10.0
+    exposure_us: 10000
+    black_level: 0.0
+    gain_db: 0.0
+    trigger_mode: "software"
+    buffers: 16
+    focus_fixed: -1
+    width: 640
+    height: 480

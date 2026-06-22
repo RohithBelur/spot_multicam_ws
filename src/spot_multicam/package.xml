@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>spot_multicam</name>
+  <version>0.1.0</version>
+  <description>
+    ROS2 reimplementation of a distributed IDS multi-camera capture system, originally
+    orchestrated via SSH/rsync and triggered from a Boston Dynamics Spot RemoteMissionService.
+    Phase 1: single-camera node with mock and real (IDS peak) backends.
+  </description>
+  <maintainer email="rohithbr@gmx.de">Rohith Belur Ravish</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_python</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>cv_bridge</depend>
+
+  <!-- mission/ subpackage: Spot-facing RemoteMissionService bridge.
+       Not a ROS2 dependency - installed separately via pip:
+       pip install bosdyn-client bosdyn-mission --break-system-packages -->
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
