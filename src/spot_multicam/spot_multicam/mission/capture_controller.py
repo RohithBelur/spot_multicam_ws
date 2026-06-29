@@ -19,6 +19,8 @@ this interface.
 import time
 from abc import ABC, abstractmethod
 
+from rclpy.node import Node
+
 
 class CaptureController(ABC):
     """Interface the RemoteMissionService depends on. Swap implementations,
@@ -79,30 +81,82 @@ class LoggingCaptureController(CaptureController):
 
 
 class Ros2ActionCaptureController(CaptureController):
-    """PLACEHOLDER for Phase 4 integration - not implemented yet.
+    """Calls the CaptureAction server from the Spot RemoteMissionService.
 
-    Once the ROS2 action server exists (start_capture/stop_capture action,
-    interval_s as the goal), this class should:
-      - create or receive an rclpy node
-      - create an ActionClient for that action
-      - in start(): send a goal with interval_s, don't block waiting for result
-      - in stop(): cancel the active goal, await the result for total_frames
+    This is the bridge between the gRPC-facing CaptureMissionServicer and
+    the ROS2-facing CaptureActionServer — the seam that was left as a
+    NotImplementedError stub until Phase 4 existed.
 
-    Left unimplemented intentionally so this seam is visible rather than
-    silently wrong.
+    start() sends a goal to the action server (non-blocking).
+    stop() cancels the active goal and waits for the result (total_frames).
     """
 
-    def __init__(self, ros_node=None):
-        self._ros_node = ros_node
+    def __init__(self, ros_node: Node):
+        import rclpy
+        from rclpy.action import ActionClient
+        from spot_multicam_msgs.action import CaptureAction
+
+        self._node = ros_node
+        self._client = ActionClient(ros_node, CaptureAction, 'capture')
+        self._goal_handle = None
+        self._logger = ros_node.get_logger()
 
     def start(self, interval_s: float) -> None:
-        raise NotImplementedError(
-            'Ros2ActionCaptureController.start() - implement once the Phase 4 '
-            'ROS2 action server exists. Use LoggingCaptureController until then.'
+        from spot_multicam_msgs.action import CaptureAction
+
+        if not self._client.wait_for_server(timeout_sec=5.0):
+            raise RuntimeError(
+                'CaptureAction server not available after 5s timeout. '
+                'Is capture_action_server running?'
+            )
+
+        goal = CaptureAction.Goal()
+        goal.interval_s = float(interval_s)
+        goal.duration_s = 0.0  # run until cancelled (= stop_capture tick)
+
+        # send_goal_async is non-blocking — mirrors original start_capture
+        # which returned immediately after starting all camera nodes.
+        future = self._client.send_goal_async(goal)
+        future.add_done_callback(self._on_goal_response)
+        self._logger.info(
+            f'[Ros2ActionCaptureController] start_capture sent '
+            f'(interval_s={interval_s})'
         )
 
+    def _on_goal_response(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self._logger.error('[Ros2ActionCaptureController] Goal rejected by action server')
+            return
+        self._goal_handle = goal_handle
+        self._logger.info('[Ros2ActionCaptureController] Goal accepted')
+
     def stop(self) -> dict:
-        raise NotImplementedError(
-            'Ros2ActionCaptureController.stop() - implement once the Phase 4 '
-            'ROS2 action server exists. Use LoggingCaptureController until then.'
-        )
+        if self._goal_handle is None:
+            self._logger.warn(
+                '[Ros2ActionCaptureController] stop() called but no active goal'
+            )
+            return {'total_frames': 0}
+
+        # Cancel the goal — the action server interprets this as stop_capture
+        cancel_future = self._goal_handle.cancel_goal_async()
+
+        # Spin until cancel is acknowledged and result arrives
+        import rclpy
+        rclpy.spin_until_future_complete(self._node, cancel_future, timeout_sec=10.0)
+
+        result_future = self._goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self._node, result_future, timeout_sec=10.0)
+
+        self._goal_handle = None
+
+        if result_future.done():
+            result = result_future.result().result
+            self._logger.info(
+                f'[Ros2ActionCaptureController] stop_capture complete: '
+                f'total_frames={result.total_frames}'
+            )
+            return {'total_frames': result.total_frames}
+
+        self._logger.warn('[Ros2ActionCaptureController] stop() timed out waiting for result')
+        return {'total_frames': 0}

@@ -14,6 +14,7 @@ find_package(std_msgs REQUIRED)
 # for CaptureMetadata.msg automatically during colcon build.
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CaptureMetadata.msg"
+  "action/CaptureAction.action"
   DEPENDENCIES std_msgs
 )
 

@@ -1,0 +1,36 @@
+# CaptureAction.action
+#
+# Models the original system's start_capture / stop_capture mission commands
+# as a ROS2 action:
+#
+#   - Goal:    start capturing at a given interval (mirrors start_capture +
+#              interval_s from the original RemoteMissionService)
+#   - Feedback: frames captured so far, so callers can monitor progress
+#   - Result:   total frames captured when stop is requested or goal completes
+#
+# Why an action rather than a service?
+#   A service call blocks until it returns. start_capture is long-running --
+#   you send it and capture keeps going until you cancel or the duration
+#   expires. Actions support goal/cancel/feedback/result natively, which
+#   is exactly that pattern. This is a common ROS2 design interview question.
+
+# --- Goal (sent by the client to start capture) ---
+# Per-camera capture interval in seconds, clamped [0.05, 5.0]
+# Matches interval_s in the RemoteMissionService parameter spec.
+float32 interval_s
+# Maximum capture duration in seconds. 0.0 means run until cancelled.
+float32 duration_s
+---
+
+# --- Result (returned when action completes or is cancelled) ---
+# Total number of frames captured across all active camera nodes
+uint64 total_frames
+# True if capture was stopped by a cancel request (vs. duration expiry)
+bool cancelled
+---
+
+# --- Feedback (published periodically while capture is running) ---
+# Frames captured so far
+uint64 frames_so_far
+# Elapsed time since capture started, in seconds
+float32 elapsed_s
