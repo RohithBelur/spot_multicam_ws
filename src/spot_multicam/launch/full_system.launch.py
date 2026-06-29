@@ -66,9 +66,18 @@ def generate_launch_description():
         output='screen',
     )
 
+    tf_broadcaster_node = Node(
+        package='spot_multicam',
+        executable='camera_tf_broadcaster',
+        name='camera_tf_broadcaster',
+        output='screen',
+        parameters=[os.path.join(pkg_share, 'config', 'camera_transforms.yaml')],
+    )
+
     return LaunchDescription([
         use_mock_arg,
         cam1_node,
         cam2_node,
         action_server_node,
+        tf_broadcaster_node,
     ])

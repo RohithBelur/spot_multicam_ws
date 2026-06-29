@@ -31,6 +31,7 @@ setup(
         'console_scripts': [
             'camera_capture_node = spot_multicam.camera_capture_node:main',
             'capture_action_server = spot_multicam.capture_action_server:main',
+            'camera_tf_broadcaster = spot_multicam.camera_tf_broadcaster:main',
             'capture_mission_service = spot_multicam.mission.capture_mission_service:main',
         ],
     },

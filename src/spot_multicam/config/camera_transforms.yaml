@@ -1,0 +1,33 @@
+# camera_transforms.yaml
+#
+# Mounting offsets for each camera relative to Spot's body frame.
+# All values are PLACEHOLDERS - replace with real measured offsets.
+#
+# Translation: metres, ROS REP-103 convention (x=forward, y=left, z=up)
+# Rotation: quaternion (x, y, z, w) - use a tool like
+#   ros2 run tf2_ros tf2_echo to verify transforms look correct in RViz
+#
+# To measure real offsets:
+#   1. Use calipers/tape to measure camera mount position on Spot's body
+#   2. Spot body origin is approximately at the geometric centre of the body
+#   3. Use your CAD model (Siemens NX) if the mount was designed there
+
+camera_tf_broadcaster:
+  ros__parameters:
+    cam1:
+      tx: 0.4      # 40cm forward
+      ty: -0.1     # 10cm right
+      tz: 0.1      # 10cm up
+      qx: 0.0
+      qy: 0.0
+      qz: 0.0
+      qw: 1.0      # no rotation (camera aligned with body axes)
+
+    cam2:
+      tx: 0.4
+      ty: 0.1      # 10cm left (symmetric)
+      tz: 0.1
+      qx: 0.0
+      qy: 0.0
+      qz: 0.0
+      qw: 1.0
