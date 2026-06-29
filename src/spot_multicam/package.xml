@@ -17,6 +17,7 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>cv_bridge</depend>
+  <depend>spot_multicam_msgs</depend>
 
   <!-- mission/ subpackage: Spot-facing RemoteMissionService bridge.
        Not a ROS2 dependency - installed separately via pip:

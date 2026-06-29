@@ -1,24 +1,21 @@
 """
 camera_capture_node.py
 
-Phase 1 of the spot_multicam ROS2 port: a single-camera capture node that
-declares the same tunables as the original capture.py CLI flags, but exposes
-them as ROS2 parameters, and publishes frames on a topic instead of writing
-files to disk.
+Phase 3 update: metadata publisher switched from std_msgs/String (JSON) to
+the proper spot_multicam_msgs/CaptureMetadata message type. Everything else
+(parameters, image publisher, backends, namespace layout) is unchanged from
+Phase 1/2.
 
-Namespace-ready by design: launch two instances under different namespaces
-(see launch/multi_camera.launch.py) and you get cam1/image_raw, cam2/image_raw,
-etc. with zero code changes - that's the Phase 2 scale-up, this node doesn't
-need to know how many siblings it has.
+Phase 3 teaches: importing a custom message, populating its fields including
+the std_msgs/Header stamp, and publishing it alongside sensor_msgs/Image.
 """
 
-import json
 import time
 
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from std_msgs.msg import String
+from spot_multicam_msgs.msg import CaptureMetadata
 
 from spot_multicam.mock_camera_backend import MockCameraBackend
 from spot_multicam.ids_camera_backend import IdsCameraBackend
@@ -33,15 +30,15 @@ class CameraCaptureNode(Node):
         self.declare_parameter('use_mock', True)
         self.declare_parameter('camera_prefix', 'cam1')
         self.declare_parameter('serial', '')
-        self.declare_parameter('frame_rate', 10.0)         # Hz, matches --frame-rate
-        self.declare_parameter('exposure_us', 10000)        # matches --exposure-us
-        self.declare_parameter('black_level', 0.0)          # matches --black-level
-        self.declare_parameter('gain_db', 0.0)               # matches --gain-db
-        self.declare_parameter('trigger_mode', 'software')   # matches --trigger
-        self.declare_parameter('buffers', 16)                 # matches --buffers
-        self.declare_parameter('focus_fixed', -1)             # matches --focus-fixed, -1 = unset
-        self.declare_parameter('width', 640)                  # mock backend only
-        self.declare_parameter('height', 480)                 # mock backend only
+        self.declare_parameter('frame_rate', 10.0)
+        self.declare_parameter('exposure_us', 10000)
+        self.declare_parameter('black_level', 0.0)
+        self.declare_parameter('gain_db', 0.0)
+        self.declare_parameter('trigger_mode', 'software')
+        self.declare_parameter('buffers', 16)
+        self.declare_parameter('focus_fixed', -1)
+        self.declare_parameter('width', 640)
+        self.declare_parameter('height', 480)
 
         self._use_mock = self.get_parameter('use_mock').value
         self._camera_prefix = self.get_parameter('camera_prefix').value
@@ -60,15 +57,13 @@ class CameraCaptureNode(Node):
             raise ValueError('frame_rate parameter must be > 0')
 
         # --- Publishers ------------------------------------------------------
-        # Topic names are relative (no leading '/'), so namespacing at launch
-        # time (see launch/multi_camera.launch.py) naturally produces
-        # /cam1/image_raw, /cam2/image_raw, etc.
         self._image_pub = self.create_publisher(Image, 'image_raw', 10)
-        # Placeholder for the Phase 3 custom CaptureMetadata.msg - JSON string
-        # for now so this is usable end-to-end before that message exists.
-        self._metadata_pub = self.create_publisher(String, 'metadata', 10)
+        # Phase 3: proper typed message instead of JSON string.
+        # ros2 topic echo /cam1/metadata now shows structured fields,
+        # not a raw JSON blob.
+        self._metadata_pub = self.create_publisher(CaptureMetadata, 'metadata', 10)
 
-        # --- Backend selection -------------------------------------------------
+        # --- Backend selection -----------------------------------------------
         if self._use_mock:
             self.get_logger().info(
                 f'[{self._camera_prefix}] Using MockCameraBackend '
@@ -103,27 +98,31 @@ class CameraCaptureNode(Node):
         try:
             frame, metadata = self._backend.grab_frame()
         except NotImplementedError as exc:
-            # Real backend stub not ported yet - fail loudly and clearly
-            # rather than silently publishing nothing.
-            self.get_logger().error(
-                f'[{self._camera_prefix}] {exc}'
-            )
+            self.get_logger().error(f'[{self._camera_prefix}] {exc}')
             self._timer.cancel()
             return
-        except Exception as exc:  # noqa: BLE001 - log and keep node alive
+        except Exception as exc:  # noqa: BLE001
             self.get_logger().warn(f'[{self._camera_prefix}] grab_frame() failed: {exc}')
             return
 
+        now = self.get_clock().now().to_msg()
+
         img_msg = self._frame_to_image_msg(frame)
+        # Image header stamp matches metadata stamp - both reference the
+        # same capture moment, which matters for tf2 lookups in Phase 6.
+        img_msg.header.stamp = now
+        img_msg.header.frame_id = self._camera_prefix
         self._image_pub.publish(img_msg)
 
-        metadata_msg = String()
-        metadata_msg.data = json.dumps({
-            'camera_prefix': self._camera_prefix,
-            'timestamp': metadata.get('capture_time', time.time()),
-            **metadata,
-        })
-        self._metadata_pub.publish(metadata_msg)
+        meta_msg = CaptureMetadata()
+        meta_msg.header.stamp = now
+        meta_msg.header.frame_id = self._camera_prefix
+        meta_msg.camera_prefix = self._camera_prefix
+        meta_msg.serial = str(metadata.get('serial', ''))
+        meta_msg.frame_id = int(metadata.get('frame_id', 0))
+        meta_msg.exposure_us = int(metadata.get('exposure_us', 0))
+        meta_msg.is_mock = bool(metadata.get('mock', False))
+        self._metadata_pub.publish(meta_msg)
 
         self._frames_published += 1
         if self._frames_published % 50 == 0:
@@ -133,12 +132,6 @@ class CameraCaptureNode(Node):
 
     @staticmethod
     def _frame_to_image_msg(frame) -> Image:
-        """Manual numpy -> sensor_msgs/Image conversion (bgr8).
-
-        Avoids a hard cv_bridge dependency for the mock-data path; once the
-        real IDS backend is wired in, swapping this for cv_bridge.CvBridge()
-        is a one-line change if preferred.
-        """
         msg = Image()
         msg.height = frame.shape[0]
         msg.width = frame.shape[1]
@@ -168,3 +161,4 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+

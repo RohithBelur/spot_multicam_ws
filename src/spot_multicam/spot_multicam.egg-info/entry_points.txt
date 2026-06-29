@@ -1,3 +1,0 @@
-[console_scripts]
-camera_capture_node = spot_multicam.camera_capture_node:main
-capture_mission_service = spot_multicam.mission.capture_mission_service:main
